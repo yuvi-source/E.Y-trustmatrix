@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv("backend/.env.local")
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

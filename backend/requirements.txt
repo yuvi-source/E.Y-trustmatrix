@@ -5,3 +5,5 @@ pydantic
 pytesseract
 Pillow
 reportlab
+python-dotenv
+requests

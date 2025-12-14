@@ -1,4 +1,5 @@
 external_id,name,phone,address,specialty,license_no,license_expiry,affiliations
+1679576722,Demo Provider,,,,,,
 P001,Dr. Rohan Verma,022-40001234,"ABC Heart Clinic, Andheri East, Mumbai",Cardiology,LIC-ROHAN-1,2026-06-30,
 P002,Dr. Meera Patel,079-22223333,"Sunshine Hospital, Navrangpura, Ahmedabad",Dermatology,LIC-MEERA-1,2025-01-10,
 P003,Dr. Arjun Shah,022-50000001,"City Care Clinic, Bandra, Mumbai",Internal Medicine,LIC-ARJUN-1,2026-03-15,

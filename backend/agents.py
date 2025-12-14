@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+from .external.npi_client import fetch_npi_data
+
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
@@ -21,6 +24,10 @@ DATA_DIR = Path(__file__).resolve().parent / "data"
 SOURCE_PRIORITY = ["npi", "state_board", "hospital", "maps", "original"]
 
 
+def looks_like_npi(value: str) -> bool:
+    return value.isdigit() and len(value) == 10
+
+
 def _load_json(name: str) -> Any:
     path = DATA_DIR / name
     if not path.exists():
@@ -29,7 +36,12 @@ def _load_json(name: str) -> Any:
         return json.load(f)
 
 
+USE_REAL_NPI = os.getenv("USE_REAL_NPI", "false").lower() == "true"
 NPI_REGISTRY = _load_json("npi_registry.json")
+
+# Temporarily in agents.py
+print("USE_REAL_NPI =", USE_REAL_NPI)
+
 STATE_BOARD = _load_json("state_board.json")
 MAPS_DIR = _load_json("maps_directory.json")
 HOSPITAL_DIR = _load_json("hospital_directory.json")
@@ -41,7 +53,12 @@ def validate_provider(db: Session, provider_id: int) -> Dict[str, Any]:
         return {}
 
     external_id = provider.external_id
-    npi = NPI_REGISTRY.get(external_id, {})
+    if USE_REAL_NPI and looks_like_npi(external_id):
+        print("Calling CMS NPI API for:", external_id)
+        npi = fetch_npi_data(external_id)
+    else:
+        npi = NPI_REGISTRY.get(external_id, {})
+
     board = STATE_BOARD.get(external_id, {})
     maps = MAPS_DIR.get(external_id, {})
     hospital = HOSPITAL_DIR.get(external_id, {})
