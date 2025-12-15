@@ -7,3 +7,7 @@ Pillow
 reportlab
 python-dotenv
 requests
+google-generativeai
+pytest
+pytest-mock
+httpx

@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 import os
-from .external.npi_client import fetch_npi_data
-
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
 
-import json
 import pytesseract
 from PIL import Image
 from sqlalchemy.orm import Session
 
+from .external.npi_client import fetch_npi_data
 from .db import (
     Provider,
     Document,
@@ -19,13 +18,15 @@ from .db import (
     ManualReviewItem,
 )
 
+# -------------------------------------------------
+# Config / Data
+# -------------------------------------------------
+
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
 SOURCE_PRIORITY = ["npi", "state_board", "hospital", "maps", "original"]
 
-
-def looks_like_npi(value: str) -> bool:
-    return value.isdigit() and len(value) == 10
+USE_REAL_NPI = os.getenv("USE_REAL_NPI", "false").lower() == "true"
 
 
 def _load_json(name: str) -> Any:
@@ -36,16 +37,23 @@ def _load_json(name: str) -> Any:
         return json.load(f)
 
 
-USE_REAL_NPI = os.getenv("USE_REAL_NPI", "false").lower() == "true"
 NPI_REGISTRY = _load_json("npi_registry.json")
-
-# Temporarily in agents.py
-print("USE_REAL_NPI =", USE_REAL_NPI)
-
 STATE_BOARD = _load_json("state_board.json")
 MAPS_DIR = _load_json("maps_directory.json")
 HOSPITAL_DIR = _load_json("hospital_directory.json")
 
+
+# -------------------------------------------------
+# Utilities
+# -------------------------------------------------
+
+def looks_like_npi(value: str) -> bool:
+    return value.isdigit() and len(value) == 10
+
+
+# -------------------------------------------------
+# External Validation
+# -------------------------------------------------
 
 def validate_provider(db: Session, provider_id: int) -> Dict[str, Any]:
     provider = db.query(Provider).get(provider_id)
@@ -53,8 +61,8 @@ def validate_provider(db: Session, provider_id: int) -> Dict[str, Any]:
         return {}
 
     external_id = provider.external_id
+
     if USE_REAL_NPI and looks_like_npi(external_id):
-        print("Calling CMS NPI API for:", external_id)
         npi = fetch_npi_data(external_id)
     else:
         npi = NPI_REGISTRY.get(external_id, {})
@@ -71,7 +79,7 @@ def validate_provider(db: Session, provider_id: int) -> Dict[str, Any]:
         "license_expiry": [],
     }
 
-    def add_candidate(field: str, source: str, value: Any) -> None:
+    def add_candidate(field: str, source: str, value: Any):
         if value:
             candidates[field].append({"source": source, "value": value})
 
@@ -87,14 +95,22 @@ def validate_provider(db: Session, provider_id: int) -> Dict[str, Any]:
         add_candidate("license_no", src_name, src_data.get("license_no"))
         add_candidate("license_expiry", src_name, src_data.get("license_expiry"))
 
+    # Original values
     add_candidate("phone", "original", provider.phone)
     add_candidate("address", "original", provider.address)
     add_candidate("specialty", "original", provider.specialty)
     add_candidate("license_no", "original", provider.license_no)
     add_candidate("license_expiry", "original", provider.license_expiry)
 
-    return {"provider_id": provider_id, "candidates": candidates}
+    return {
+        "provider_id": provider_id,
+        "candidates": candidates,
+    }
 
+
+# -------------------------------------------------
+# OCR
+# -------------------------------------------------
 
 def extract_from_pdf(db: Session, provider_id: int) -> Dict[str, Any]:
     doc = (
@@ -102,6 +118,7 @@ def extract_from_pdf(db: Session, provider_id: int) -> Dict[str, Any]:
         .filter(Document.provider_id == provider_id, Document.doc_type == "license")
         .first()
     )
+
     if not doc or not doc.path:
         return {}
 
@@ -110,15 +127,19 @@ def extract_from_pdf(db: Session, provider_id: int) -> Dict[str, Any]:
         return {}
 
     image = Image.open(img_path)
+
     try:
-        ocr_result = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
+        ocr_result = pytesseract.image_to_data(
+            image, output_type=pytesseract.Output.DICT
+        )
         text = " ".join(ocr_result.get("text", []))
-        confidences = [float(c) for c in ocr_result.get("conf", []) if c not in ("-1", -1)]
+        confidences = [
+            float(c) for c in ocr_result.get("conf", []) if c not in ("-1", -1)
+        ]
         ocr_conf = sum(confidences) / len(confidences) / 100.0 if confidences else 0.0
     except Exception:
-        # Fallback if tesseract is not installed
         text = "OCR Unavailable"
-        ocr_conf = 0.7  # Neutral confidence instead of 0.0 to avoid penalizing PCS too much
+        ocr_conf = 0.7
 
     doc.ocr_text = text
     doc.ocr_confidence = ocr_conf
@@ -132,7 +153,16 @@ def extract_from_pdf(db: Session, provider_id: int) -> Dict[str, Any]:
     }
 
 
-def enrich_provider(db: Session, provider_id: int, external_data: Dict[str, Any], ocr_data: Dict[str, Any]) -> Dict[str, Any]:
+# -------------------------------------------------
+# Enrichment
+# -------------------------------------------------
+
+def enrich_provider(
+    db: Session,
+    provider_id: int,
+    external_data: Dict[str, Any],
+    ocr_data: Dict[str, Any],
+) -> Dict[str, Any]:
     provider = db.query(Provider).get(provider_id)
     enrichment: Dict[str, Any] = {}
 
@@ -145,13 +175,24 @@ def enrich_provider(db: Session, provider_id: int, external_data: Dict[str, Any]
     return enrichment
 
 
+# -------------------------------------------------
+# Confidence Engine (NO LLM)
+# -------------------------------------------------
+
 def _confidence_for_candidates(candidates: list) -> Dict[str, Any]:
     if not candidates:
         return {"best": None, "confidence": 0.0, "sources": []}
 
-    scores = {"npi": 1.0, "state_board": 0.9, "hospital": 0.7, "maps": 0.5, "original": 0.3}
+    scores = {
+        "npi": 1.0,
+        "state_board": 0.9,
+        "hospital": 0.7,
+        "maps": 0.5,
+        "original": 0.3,
+    }
 
     grouped: Dict[str, Dict[str, Any]] = {}
+
     for c in candidates:
         key = c["value"]
         if key not in grouped:
@@ -160,38 +201,74 @@ def _confidence_for_candidates(candidates: list) -> Dict[str, Any]:
         grouped[key]["score"] += scores.get(c["source"], 0.2)
 
     best = max(grouped.values(), key=lambda x: x["score"])
-    max_possible = sum(sorted(scores.values(), reverse=True)[: len(best["sources"])] or [1.0])
+    max_possible = sum(
+        sorted(scores.values(), reverse=True)[: len(best["sources"])] or [1.0]
+    )
     confidence = min(1.0, best["score"] / max_possible)
 
-    return {"best": best["value"], "confidence": confidence, "sources": best["sources"]}
+    return {
+        "best": best["value"],
+        "confidence": confidence,
+        "sources": best["sources"],
+    }
 
 
-def qa_evaluate(db: Session, provider_id: int, external_data: Dict[str, Any], enrichment: Dict[str, Any]):
+# -------------------------------------------------
+# QA Evaluation (LLM-FREE)
+# -------------------------------------------------
+
+def qa_evaluate(
+    db: Session,
+    provider_id: int,
+    external_data: Dict[str, Any],
+    enrichment: Dict[str, Any],
+):
     provider = db.query(Provider).get(provider_id)
     candidates = external_data.get("candidates", {}) if external_data else {}
-    decisions = {"auto_updates": {}, "manual_reviews": []}
 
-    # Slightly more conservative default: push more borderline cases to manual review
+    decisions = {
+        "auto_updates": {},
+        "manual_reviews": [],
+        "explanation_inputs": {},  # 👈 store inputs, NOT LLM text
+    }
+
     threshold = 0.75
 
-    for field in ["phone", "address", "specialty", "license_no", "license_expiry"]:
+    for field in [
+        "phone",
+        "address",
+        "specialty",
+        "license_no",
+        "license_expiry",
+    ]:
         field_candidates = candidates.get(field, [])
         result = _confidence_for_candidates(field_candidates)
+
         best = result["best"]
         conf = result["confidence"]
         sources = result["sources"]
 
-        fc = FieldConfidence(
-            provider_id=provider_id,
-            field_name=field,
-            confidence=conf,
-            sources=sources,
+        db.add(
+            FieldConfidence(
+                provider_id=provider_id,
+                field_name=field,
+                confidence=conf,
+                sources=sources,
+            )
         )
-        db.add(fc)
 
         current_value = getattr(provider, field)
+
         if best is None or best == current_value:
             continue
+
+        explanation_payload = {
+            "field": field,
+            "current_value": current_value,
+            "candidates": field_candidates,
+            "chosen_value": best,
+            "confidence": conf,
+        }
 
         if conf >= threshold:
             decisions["auto_updates"][field] = {
@@ -199,6 +276,7 @@ def qa_evaluate(db: Session, provider_id: int, external_data: Dict[str, Any], en
                 "to": best,
                 "confidence": conf,
             }
+            explanation_payload["decision"] = "auto_update"
         else:
             item = ManualReviewItem(
                 provider_id=provider_id,
@@ -209,17 +287,35 @@ def qa_evaluate(db: Session, provider_id: int, external_data: Dict[str, Any], en
             )
             db.add(item)
             decisions["manual_reviews"].append(item)
+            explanation_payload["decision"] = "manual_review"
 
+        decisions["explanation_inputs"][field] = explanation_payload
+
+    # Enrichment (still deterministic)
     if enrichment.get("affiliations") and not provider.affiliations:
         decisions["auto_updates"]["affiliations"] = {
             "from": provider.affiliations,
             "to": enrichment["affiliations"],
             "confidence": 0.8,
         }
+        decisions["explanation_inputs"]["affiliations"] = {
+            "field": "affiliations",
+            "current_value": provider.affiliations,
+            "candidates": [
+                {"source": "enrichment_agent", "value": enrichment["affiliations"]}
+            ],
+            "chosen_value": enrichment["affiliations"],
+            "confidence": 0.8,
+            "decision": "auto_update",
+        }
 
     db.commit()
     return decisions
 
+
+# -------------------------------------------------
+# Apply Updates
+# -------------------------------------------------
 
 def apply_updates(db: Session, provider_id: int, decisions):
     from .db import AuditLog
@@ -231,20 +327,25 @@ def apply_updates(db: Session, provider_id: int, decisions):
     for field, info in decisions.get("auto_updates", {}).items():
         old = info["from"]
         new = info["to"]
+
         setattr(provider, field, new)
         provider.last_changed_at = datetime.utcnow()
         provider.last_verified_at = datetime.utcnow()
-        log = AuditLog(
-            provider_id=provider_id,
-            field_name=field,
-            old_value=str(old) if old is not None else None,
-            new_value=str(new) if new is not None else None,
-            action="auto_update",
-            actor="validation_agent",
+
+        db.add(
+            AuditLog(
+                provider_id=provider_id,
+                field_name=field,
+                old_value=str(old) if old is not None else None,
+                new_value=str(new) if new is not None else None,
+                action="auto_update",
+                actor="validation_agent",
+            )
         )
-        db.add(log)
         auto_updates += 1
 
     db.commit()
-
-    return {"auto_updates": auto_updates, "manual_reviews": manual_reviews}
+    return {
+        "auto_updates": auto_updates,
+        "manual_reviews": manual_reviews,
+    }

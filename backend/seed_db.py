@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-load_dotenv("backend/.env.local")
+load_dotenv(".env.local")
 
 import os
 import argparse
