@@ -49,4 +49,9 @@ def explain_decision(payload: ExplainRequest, request: Request):
         explanation = summarize_qa_decision(payload.model_dump())
         return {"explanation": explanation}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Fallback to deterministic explanation to keep endpoint responsive
+        fallback = (
+            f"Decision for {payload.field}: chose {payload.chosen_value} "
+            f"with confidence {payload.confidence:.2f} from sources {payload.candidates}."
+        )
+        return {"explanation": fallback}

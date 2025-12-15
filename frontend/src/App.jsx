@@ -163,7 +163,7 @@ function ProviderDetail({ providerId, onBack }) {
 
   if (!data) return <div>Loading details...</div>;
 
-  const { provider, validation, pcs, drift } = data;
+  const { provider, validation, pcs, drift, enrichment } = data;
 
   return (
     <div className="detail-container">
@@ -250,13 +250,17 @@ function ProviderDetail({ providerId, onBack }) {
                 </thead>
                 <tbody>
                     {Object.entries(validation).map(([field, info]) => (
-                        (info.sources || []).map((src, idx) => (
+                        (info.sources || []).map((src, idx) => {
+                          const sourceLabel = typeof src === 'string' ? src : (src?.source ?? 'unknown');
+                          const sourceValue = typeof src === 'object' && src !== null ? (src.value ?? '—') : '—';
+                          return (
                             <tr key={`${field}-${idx}`}>
                                 <td>{field}</td>
-                                <td>{src.source}</td>
-                                <td>{src.value}</td>
+                                <td>{sourceLabel}</td>
+                                <td>{sourceValue}</td>
                             </tr>
-                        ))
+                          );
+                        })
                     ))}
                 </tbody>
              </table>
@@ -281,6 +285,45 @@ function ProviderDetail({ providerId, onBack }) {
               <small>DQ: Doc Quality | RP: Responsiveness | LH: License Health | HA: History</small>
             </div>
           </div>
+
+          {enrichment && (
+            <div className="card">
+              <h3>🧠 Enrichment Summary</h3>
+              <p>{enrichment.summary || "No summary available (LLM disabled or no data)."}</p>
+              <div className="enrich-grid">
+                {enrichment.certifications && (
+                  <div>
+                    <strong>Certifications</strong>
+                    <ul>
+                      {enrichment.certifications.map((c, idx) => <li key={idx}>{c}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {enrichment.affiliations && (
+                  <div>
+                    <strong>Affiliations</strong>
+                    <ul>
+                      {enrichment.affiliations.map((a, idx) => <li key={idx}>{a}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {enrichment.education && (
+                  <div>
+                    <strong>Education</strong>
+                    <p>{enrichment.education}</p>
+                  </div>
+                )}
+                {enrichment.secondary_specialties && enrichment.secondary_specialties.length > 0 && (
+                  <div>
+                    <strong>Secondary Specialties</strong>
+                    <ul>
+                      {enrichment.secondary_specialties.map((s, idx) => <li key={idx}>{s}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

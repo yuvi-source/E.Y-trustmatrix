@@ -1,7 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..db import get_db, Provider, ProviderScore, DriftScore, FieldConfidence, AuditLog, Document
+from ..db import (
+    get_db,
+    Provider,
+    ProviderScore,
+    DriftScore,
+    FieldConfidence,
+    AuditLog,
+    Document,
+)
+from ..agents import InformationEnrichmentAgent
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 
@@ -40,6 +49,17 @@ async def get_provider_details(provider_id: int, db: Session = Depends(get_db)):
             "sources": c.sources # This contains the candidates
         }
 
+    # On-demand enrichment summary (non-persistent) to show in UI
+    enrichment_agent = InformationEnrichmentAgent()
+    enrichment_result = enrichment_agent.enrich_provider(db, provider.id)
+    enrichment_payload = {
+        "summary": enrichment_result.enriched_fields.get("summary"),
+        "certifications": enrichment_result.enriched_fields.get("certifications"),
+        "affiliations": enrichment_result.enriched_fields.get("affiliations"),
+        "education": enrichment_result.enriched_fields.get("education"),
+        "secondary_specialties": enrichment_result.enriched_fields.get("secondary_specialties"),
+    }
+
     return {
         "provider": {
             "id": provider.id,
@@ -69,7 +89,8 @@ async def get_provider_details(provider_id: int, db: Session = Depends(get_db)):
             "score": drift.score if drift else 0,
             "bucket": drift.bucket if drift else "Low",
             "explanation": "High drift detected due to license expiry proximity." if drift and drift.bucket == "High" else "Stable data patterns."
-        } if drift else None
+        } if drift else None,
+        "enrichment": enrichment_payload,
     }
 
 

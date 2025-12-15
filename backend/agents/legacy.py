@@ -10,8 +10,8 @@ import pytesseract
 from PIL import Image
 from sqlalchemy.orm import Session
 
-from .external.npi_client import fetch_npi_data
-from .db import (
+from ..external.npi_client import fetch_npi_data
+from ..db import (
     Provider,
     Document,
     FieldConfidence,
@@ -22,7 +22,7 @@ from .db import (
 # Config / Data
 # -------------------------------------------------
 
-DATA_DIR = Path(__file__).resolve().parent / "data"
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 SOURCE_PRIORITY = ["npi", "state_board", "hospital", "maps", "original"]
 
@@ -318,7 +318,7 @@ def qa_evaluate(
 # -------------------------------------------------
 
 def apply_updates(db: Session, provider_id: int, decisions):
-    from .db import AuditLog
+    from ..db import AuditLog
 
     provider = db.query(Provider).get(provider_id)
     auto_updates = 0

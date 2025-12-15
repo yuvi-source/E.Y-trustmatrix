@@ -7,9 +7,10 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.db import Base
 
-# Always load env from project root
-env_path = Path(__file__).resolve().parent.parent / ".env.local"
-load_dotenv(env_path)
+# Always load env from project root (.env.local preferred, fallback to .env)
+root = Path(__file__).resolve().parent.parent
+load_dotenv(root / ".env.local")
+load_dotenv(root / ".env")
 
 @pytest.fixture
 def db_session():
