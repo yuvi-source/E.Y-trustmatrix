@@ -372,7 +372,7 @@ function ProviderDetail({ providerId, onBack }) {
               <small>DQ: Doc Quality | RP: Responsiveness | LH: License Health | HA: History</small>
             </div>
           </div>
-
+{/* 
           {enrichment && (
             <div className="card">
               <h3>🧠 Enrichment Summary</h3>
@@ -410,7 +410,7 @@ function ProviderDetail({ providerId, onBack }) {
                 )}
               </div>
             </div>
-          )}
+          )} */}
         </div>
       </div>
     </div>
