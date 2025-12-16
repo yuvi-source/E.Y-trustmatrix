@@ -117,7 +117,7 @@ Keep empty lists/strings if not found.
         return parsed
 
     def enrich_provider(self, db: Session, provider_id: int) -> EnrichmentResult:
-        provider = db.query(Provider).get(provider_id)
+        provider = db.get(Provider, provider_id)
         if not provider:
             raise ValueError(f"Provider {provider_id} not found")
 

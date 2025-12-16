@@ -8,33 +8,29 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 
 
 @router.get("")
-def get_stats(db: Session = Depends(get_db)):
+async def get_stats(db: Session = Depends(get_db)):
     latest = (
         db.query(ValidationRun)
         .order_by(ValidationRun.started_at.desc())
         .first()
     )
+    
+    # Use SQL aggregation instead of loading all scores
     total_pcs = db.query(func.count(ProviderScore.id)).scalar() or 0
     avg_pcs = db.query(func.avg(ProviderScore.pcs)).scalar() if total_pcs else None
 
+    drift_rows = db.query(DriftScore).all()
     drift_dist = {"Low": 0, "Medium": 0, "High": 0}
-    drift_counts = db.query(DriftScore.bucket, func.count(DriftScore.id)).group_by(DriftScore.bucket).all()
-    for bucket, count in drift_counts:
-        if bucket in drift_dist:
-            drift_dist[bucket] = count
+    for d in drift_rows:
+        if d.bucket in drift_dist:
+            drift_dist[d.bucket] += 1
 
-    # PCS Distribution
-    pcs_scores = [row[0] for row in db.query(ProviderScore.pcs).all()]
+    # PCS Distribution - use SQL for efficiency
     pcs_dist = {"0-50": 0, "50-70": 0, "70-90": 0, "90-100": 0}
-    for score in pcs_scores:
-        if score < 50:
-            pcs_dist["0-50"] += 1
-        elif score < 70:
-            pcs_dist["50-70"] += 1
-        elif score < 90:
-            pcs_dist["70-90"] += 1
-        else:
-            pcs_dist["90-100"] += 1
+    pcs_dist["0-50"] = db.query(func.count(ProviderScore.id)).filter(ProviderScore.pcs < 50).scalar() or 0
+    pcs_dist["50-70"] = db.query(func.count(ProviderScore.id)).filter(ProviderScore.pcs >= 50, ProviderScore.pcs < 70).scalar() or 0
+    pcs_dist["70-90"] = db.query(func.count(ProviderScore.id)).filter(ProviderScore.pcs >= 70, ProviderScore.pcs < 90).scalar() or 0
+    pcs_dist["90-100"] = db.query(func.count(ProviderScore.id)).filter(ProviderScore.pcs >= 90).scalar() or 0
 
     # Trend (Last 5 runs)
     last_runs = (

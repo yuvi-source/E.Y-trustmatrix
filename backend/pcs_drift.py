@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Tuple
 
 from sqlalchemy.orm import Session
@@ -19,7 +19,7 @@ def _compute_srm(db: Session, provider: Provider) -> float:
 def _compute_fr(provider: Provider) -> float:
     if not provider.last_verified_at:
         return 0.3
-    days = (datetime.utcnow() - provider.last_verified_at).days
+    days = (datetime.now(timezone.utc) - provider.last_verified_at.replace(tzinfo=timezone.utc)).days
     if days <= 30:
         return 1.0
     if days <= 90:
@@ -32,7 +32,7 @@ def _compute_fr(provider: Provider) -> float:
 def _compute_st(provider: Provider) -> float:
     if not provider.last_changed_at:
         return 1.0
-    days = (datetime.utcnow() - provider.last_changed_at).days
+    days = (datetime.now(timezone.utc) - provider.last_changed_at.replace(tzinfo=timezone.utc)).days
     if days > 180:
         return 1.0
     if days > 90:
@@ -75,7 +75,7 @@ def _compute_lh(provider: Provider) -> float:
         expiry = datetime.strptime(provider.license_expiry, "%Y-%m-%d")
     except ValueError:
         return 0.4
-    days = (expiry - datetime.utcnow()).days
+    days = (expiry - datetime.now(timezone.utc).replace(tzinfo=None)).days
     if days >= 60:
         return 1.0
     if days >= 30:
@@ -158,7 +158,7 @@ def compute_drift(db: Session, provider: Provider) -> Tuple[float, str, int]:
     base = 0.2
 
     if provider.last_changed_at:
-        days = (datetime.utcnow() - provider.last_changed_at).days
+        days = (datetime.now(timezone.utc) - provider.last_changed_at.replace(tzinfo=timezone.utc)).days
         if days < 30:
             base += 0.35
         elif days < 90:
@@ -167,7 +167,7 @@ def compute_drift(db: Session, provider: Provider) -> Tuple[float, str, int]:
     if provider.license_expiry:
         try:
             expiry = datetime.strptime(provider.license_expiry, "%Y-%m-%d")
-            days_to_expiry = (expiry - datetime.utcnow()).days
+            days_to_expiry = (expiry - datetime.now(timezone.utc).replace(tzinfo=None)).days
             if days_to_expiry < 0:
                 base += 0.35
             elif days_to_expiry < 30:

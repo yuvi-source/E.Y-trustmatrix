@@ -29,6 +29,7 @@ def test_information_enrichment_agent_extracts_fields(db_session, monkeypatch):
     )
 
     agent = InformationEnrichmentAgent()
+    agent.llm_enabled = True  # Enable LLM so the mocked call_gemini is used
     result = agent.enrich_provider(db_session, provider.id)
 
     assert result.provider_id == provider.id

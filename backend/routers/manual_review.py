@@ -26,10 +26,10 @@ async def list_manual_review(db: Session = Depends(get_db)):
 
 @router.post("/{item_id}/approve")
 async def approve_manual_review(item_id: int, db: Session = Depends(get_db)):
-    item = db.query(ManualReviewItem).get(item_id)
+    item = db.get(ManualReviewItem, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    provider = db.query(Provider).get(item.provider_id)
+    provider = db.get(Provider, item.provider_id)
     if not provider:
         raise HTTPException(status_code=404, detail="Provider not found")
 
@@ -53,10 +53,10 @@ async def approve_manual_review(item_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{item_id}/override")
 async def override_manual_review(item_id: int, value: str, db: Session = Depends(get_db)):
-    item = db.query(ManualReviewItem).get(item_id)
+    item = db.get(ManualReviewItem, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    provider = db.query(Provider).get(item.provider_id)
+    provider = db.get(Provider, item.provider_id)
     if not provider:
         raise HTTPException(status_code=404, detail="Provider not found")
 

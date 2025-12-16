@@ -1,11 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from backend.pcs_drift import _compute_fr, _compute_st, compute_drift
 from backend.db import Provider, ProviderScore
 
 
 def test_freshness_scores():
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     p = Provider(name="Test", external_id="T1")
     p.last_verified_at = now
     assert _compute_fr(p) == 1.0
@@ -18,7 +18,7 @@ def test_freshness_scores():
 
 
 def test_stability_scores():
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     p = Provider(name="Test", external_id="T1")
     p.last_changed_at = now - timedelta(days=10)
     assert _compute_st(p) == 0.3

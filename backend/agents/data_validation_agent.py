@@ -187,7 +187,7 @@ Respond in JSON with keys: value, confidence, sources.
         """
         Main entry: fetch external signals, run LLM reasoning, persist confidence.
         """
-        provider = db.query(Provider).get(provider_id)
+        provider = db.get(Provider, provider_id)
         if not provider:
             raise ValueError(f"Provider {provider_id} not found")
 

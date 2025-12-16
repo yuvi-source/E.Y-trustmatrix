@@ -32,7 +32,7 @@ async def get_provider_ocr(provider_id: int, db: Session = Depends(get_db)):
 @router.get("/{provider_id}/details")
 async def get_provider_details(provider_id: int, db: Session = Depends(get_db)):
     # This endpoint aggregates everything for the detail page
-    provider = db.query(Provider).get(provider_id)
+    provider = db.get(Provider, provider_id)
     if not provider:
         raise HTTPException(status_code=404, detail="Provider not found")
     

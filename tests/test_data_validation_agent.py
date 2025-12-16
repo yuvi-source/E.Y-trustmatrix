@@ -27,6 +27,7 @@ def test_data_validation_agent_returns_validated_fields(db_session, monkeypatch)
     monkeypatch.setattr("backend.agents.data_validation_agent.call_gemini", fake_call_gemini)
 
     agent = DataValidationAgent(use_live_npi=False)
+    agent.llm_enabled = True  # Enable LLM so the mocked call_gemini is used
     result = agent.validate_provider(db_session, provider.id)
 
     assert result.provider_id == provider.id

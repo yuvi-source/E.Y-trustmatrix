@@ -3,9 +3,11 @@ import pytest
 from backend.llm.qa_summarizer import summarize_qa_decision
 
 @pytest.mark.integration
+@pytest.mark.skipif(
+    not (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
+    reason="GEMINI_API_KEY or GOOGLE_API_KEY not set - skipping integration test"
+)
 def test_qa_summarizer_real_gemini():
-    assert os.getenv("GEMINI_API_KEY") is not None, "GEMINI_API_KEY not loaded"
-
     payload = {
         "field": "phone",
         "current_value": "123",

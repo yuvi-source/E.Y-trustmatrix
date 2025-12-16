@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any
 
@@ -163,7 +163,7 @@ def enrich_provider(
     external_data: Dict[str, Any],
     ocr_data: Dict[str, Any],
 ) -> Dict[str, Any]:
-    provider = db.query(Provider).get(provider_id)
+    provider = db.get(Provider, provider_id)
     enrichment: Dict[str, Any] = {}
 
     if not provider.affiliations:
@@ -223,7 +223,7 @@ def qa_evaluate(
     external_data: Dict[str, Any],
     enrichment: Dict[str, Any],
 ):
-    provider = db.query(Provider).get(provider_id)
+    provider = db.get(Provider, provider_id)
     candidates = external_data.get("candidates", {}) if external_data else {}
 
     decisions = {
@@ -320,7 +320,7 @@ def qa_evaluate(
 def apply_updates(db: Session, provider_id: int, decisions):
     from ..db import AuditLog
 
-    provider = db.query(Provider).get(provider_id)
+    provider = db.get(Provider, provider_id)
     auto_updates = 0
     manual_reviews = len(decisions.get("manual_reviews", []))
 
@@ -329,8 +329,8 @@ def apply_updates(db: Session, provider_id: int, decisions):
         new = info["to"]
 
         setattr(provider, field, new)
-        provider.last_changed_at = datetime.utcnow()
-        provider.last_verified_at = datetime.utcnow()
+        provider.last_changed_at = datetime.now(timezone.utc)
+        provider.last_verified_at = datetime.now(timezone.utc)
 
         db.add(
             AuditLog(

@@ -1,27 +1,38 @@
+"""Gemini LLM client for AI-assisted validation."""
+
 import os
+import logging
 import google.generativeai as genai
-from google.api_core import exceptions as google_exceptions
 
-MODEL_NAME = "gemini-flash-latest"
+logger = logging.getLogger(__name__)
 
-class QuotaExceededError(Exception):
-    """Raised when API quota is exceeded"""
-    pass
+# Support both API key environment variables
+_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+if _api_key:
+    genai.configure(api_key=_api_key)
+
+MODEL_NAME = "gemini-2.5-flash"
+
 
 def call_gemini(prompt: str) -> str:
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY environment variable is not set")
+    """Call Gemini API with the given prompt.
     
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(MODEL_NAME)
+    Args:
+        prompt: The prompt to send to Gemini.
+        
+    Returns:
+        The response text from Gemini.
+        
+    Raises:
+        RuntimeError: If API key is not configured.
+    """
+    if not _api_key:
+        raise RuntimeError("GEMINI_API_KEY or GOOGLE_API_KEY environment variable not configured")
     
     try:
+        model = genai.GenerativeModel(MODEL_NAME)
         response = model.generate_content(prompt)
         return response.text.strip()
-    except google_exceptions.ResourceExhausted as e:
-        # Quota exceeded - raise custom error so agents can handle gracefully
-        raise QuotaExceededError(f"Gemini API quota exceeded: {str(e)}") from e
     except Exception as e:
-        # Re-raise other exceptions
+        logger.error(f"Gemini API call failed: {e}")
         raise

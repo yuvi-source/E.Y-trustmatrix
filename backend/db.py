@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, ForeignKey, JSON, create_engine
@@ -50,7 +50,7 @@ class ValidationRun(Base):
 
     id = Column(Integer, primary_key=True)
     run_type = Column(String)
-    started_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     finished_at = Column(DateTime)
     count_processed = Column(Integer, default=0)
     auto_updates = Column(Integer, default=0)
@@ -67,7 +67,7 @@ class ManualReviewItem(Base):
     suggested_value = Column(String)
     reason = Column(String)
     status = Column(String, default="pending")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class FieldConfidence(Base):
@@ -78,7 +78,7 @@ class FieldConfidence(Base):
     field_name = Column(String)
     confidence = Column(Float)
     sources = Column(JSON)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class ProviderScore(Base):
@@ -122,7 +122,7 @@ class AuditLog(Base):
     new_value = Column(String)
     action = Column(String)  # auto_update / manual_approve / manual_override
     actor = Column(String)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 def init_db() -> None:
