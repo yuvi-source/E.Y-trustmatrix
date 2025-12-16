@@ -321,36 +321,6 @@ function ProviderDetail({ providerId, onBack }) {
             )}
           </div>
 
-          {/* SOURCE COMPARISON */}
-          <div className="card">
-            <h3>🔍 Source Comparison</h3>
-            <p>Reliability Weights: NPI (High), State Board (High), Hospital (Med), Maps (Low)</p>
-            <table className="source-table">
-              <thead>
-                <tr>
-                  <th>Field</th>
-                  <th>Source</th>
-                  <th>Value Found</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(validation).map(([field, info]) => (
-                        (info.sources || []).map((src, idx) => {
-                          const sourceLabel = typeof src === 'string' ? src : (src?.source ?? 'unknown');
-                          const sourceValue = typeof src === 'object' && src !== null ? (src.value ?? '—') : '—';
-                          return (
-                            <tr key={`${field}-${idx}`}>
-                                <td>{field}</td>
-                                <td>{sourceLabel}</td>
-                                <td>{sourceValue}</td>
-                            </tr>
-                          );
-                        })
-                    ))}
-              </tbody>
-            </table>
-          </div>
-
           <div className="card">
             <h3>📊 Confidence History</h3>
             {qaHistory.length === 0 ? (

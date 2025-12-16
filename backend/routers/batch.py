@@ -8,7 +8,7 @@ router = APIRouter(prefix="/run-batch", tags=["batch"])
 
 
 @router.post("")
-async def run_batch_endpoint(type: str = "daily", db: Session = Depends(get_db)):
+def run_batch_endpoint(type: str = "daily", db: Session = Depends(get_db)):
     run = run_batch(db, batch_type=type)
     return {
         "id": run.id,

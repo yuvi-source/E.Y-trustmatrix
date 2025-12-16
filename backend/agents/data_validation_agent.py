@@ -155,7 +155,10 @@ Respond in JSON with keys: value, confidence, sources.
         try:
             llm_response = call_gemini(prompt)
         except Exception as exc:
-            logger.warning("LLM call failed for field %s, falling back deterministically: %s", field_name, exc)
+            # Silently fallback for quota errors to avoid log spam
+            from ..llm.gemini_client import QuotaExceededError
+            if not isinstance(exc, QuotaExceededError):
+                logger.warning("LLM call failed for field %s: %s", field_name, str(exc)[:100])
             top = max(candidates, key=lambda c: c.score_hint)
             return {"value": top.value, "confidence": 0.6, "sources": [top.source]}
 

@@ -51,6 +51,16 @@ class InformationEnrichmentAgent:
     def __init__(self):
         self.llm_enabled = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
 
+    def _fallback_extract(self, snippets: List[str]) -> Dict[str, Any]:
+        summary = " ".join(snippets)[:240] if snippets else ""
+        return {
+            "certifications": [],
+            "affiliations": [],
+            "education": "",
+            "secondary_specialties": [],
+            "summary": summary or "No enrichment data available.",
+        }
+
     def _fetch_directory_blurbs(self, provider: Provider) -> List[str]:
         """Return text snippets from hospital directory JSON as pseudo-scraped text."""
         entry = HOSPITAL_DIR.get(provider.external_id)
@@ -65,14 +75,7 @@ class InformationEnrichmentAgent:
     def _llm_structured_extract(self, provider: Provider, snippets: List[str]) -> Dict[str, Any]:
         # If no LLM key, return empty defaults.
         if not self.llm_enabled:
-            summary = " ".join(snippets)[:240] if snippets else ""
-            return {
-                "certifications": [],
-                "affiliations": [],
-                "education": "",
-                "secondary_specialties": [],
-                "summary": summary or "No enrichment data available.",
-            }
+            return self._fallback_extract(snippets)
 
         prompt = f"""
 You are enriching a clinician profile.
@@ -93,16 +96,15 @@ Keep empty lists/strings if not found.
 
         try:
             response = call_gemini(prompt)
-            parsed = json.loads(response)
+            # Clean markdown code blocks
+            cleaned = response.replace("```json", "").replace("```", "").strip()
+            parsed = json.loads(cleaned)
         except Exception as exc:
-            logger.warning("LLM enrichment failed for provider %s, using defaults: %s", provider.id, exc)
-            return {
-                "certifications": [],
-                "affiliations": [],
-                "education": "",
-                "secondary_specialties": [],
-                "summary": "LLM unavailable; defaults applied.",
-            }
+            # Silently fallback for quota errors
+            from ..llm.gemini_client import QuotaExceededError
+            if not isinstance(exc, QuotaExceededError):
+                logger.warning("LLM enrichment failed for provider %s: %s", provider.id, str(exc)[:100])
+            return self._fallback_extract(snippets)
 
         if not isinstance(parsed, dict):
             return {}

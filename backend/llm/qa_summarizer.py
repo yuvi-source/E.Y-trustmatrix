@@ -10,8 +10,7 @@ def summarize_qa_decision(payload: Dict[str, Any]) -> str:
         return _generate_fallback_explanation(payload)
     
     try:
-        print(f"[INFO] Calling Gemini API for explanation...")
-        from .gemini_client import call_gemini
+        from .gemini_client import call_gemini, QuotaExceededError
         prompt = f"""
 You are a healthcare data quality analyst.
 
@@ -35,10 +34,13 @@ Explain:
 Keep the explanation concise and professional.
 """
         result = call_gemini(prompt)
-        print(f"[SUCCESS] Gemini API returned explanation")
         return result
+    except QuotaExceededError:
+        # Silently fallback when quota is exceeded
+        return _generate_fallback_explanation(payload)
     except Exception as e:
-        print(f"[ERROR] Gemini API failed: {type(e).__name__}: {str(e)}")
+        # Only log non-quota errors
+        print(f"[WARN] Gemini API error, using fallback: {type(e).__name__}")
         return _generate_fallback_explanation(payload)
 
 def _generate_fallback_explanation(payload: Dict[str, Any]) -> str:

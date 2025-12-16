@@ -8,6 +8,12 @@ env/
 *.db
 *.sqlite3
 
+# Test artifacts
+.pytest_cache/
+
+# Runtime logs
+*.log
+
 # Node
 node_modules/
 dist/

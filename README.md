@@ -94,6 +94,10 @@ npm start
 *The frontend will run at `http://localhost:3020`*
 **Important: Frontend uses port 3020, not 3000**
 
+### Optional: One-click start (Windows)
+You can also start both servers using:
+- `START-HERE.bat` (opens backend + frontend in separate windows)
+
 ### Step 3: Trigger Data Processing
 Once both servers are running:
 1.  Open the Frontend at `http://localhost:3020`.
@@ -122,7 +126,7 @@ EY FULL/
 │   │   └── qa_summarizer.py   # AI explanation generation
 │   ├── data/                  # Mock data (NPI, State Board, Hospital, Maps)
 │   ├── routers/               # API endpoints
-│   │   ├── batch.py           # /batch (trigger validation)
+│   │   ├── batch.py           # /run-batch (trigger validation)
 │   │   ├── providers.py       # /providers (CRUD, details, list)
 │   │   ├── manual_review.py   # /manual-review (approve/reject)
 │   │   ├── reports.py         # /reports (PDF generation)
@@ -157,8 +161,8 @@ EY FULL/
 *   **OCR Issues:**
     *   If Tesseract is not found, the system will default to a 0.7 confidence score and continue processing
 *   **Gemini API Errors:**
-    *   If API key is missing/invalid, system falls back to rule-based explanations
-    *   Check .env.local file has correct GEMINI_API_KEY
+    *   If the API key is missing/invalid, quota is exceeded, or the model is unavailable, the system falls back to deterministic summaries/explanations.
+    *   Create `.env.local` in the repo root with `GEMINI_API_KEY=...` (do not commit secrets).
 *   **Database Issues:**
     *   Reset database: `python -m backend.reset_demo_state`
     *   Check database: `python check_db.py`
@@ -203,16 +207,19 @@ pytest --cov=backend tests/
 ```
 
 ## 📊 API Endpoints
-- `GET /` - Health check
+- `GET /health` - Health check
 - `GET /stats` - Dashboard statistics
 - `GET /providers` - List all providers
 - `GET /providers/{id}/details` - Provider details with validation data
-- `POST /batch` - Trigger validation batch
+- `GET /providers/{id}/ocr` - OCR panel data (if a document exists)
+- `GET /providers/{id}/qa` - Confidence history
+- `POST /run-batch?type=daily` - Trigger daily batch
 - `GET /manual-review` - List manual review items
 - `POST /manual-review/{id}/approve` - Approve review item
 - `POST /manual-review/{id}/reject` - Reject review item
-- `GET /providers/{id}/report` - Download PDF report
-- `POST /providers/{id}/explain` - Get AI explanation for field
+- `POST /manual-review/{id}/override?value=...` - Override review item
+- `GET /reports/latest` - Download latest PDF report
+- `POST /explain` - Get AI explanation for a decision
 
 ## 🎓 Learn More
 - **NPI Registry:** https://npiregistry.cms.hhs.gov/

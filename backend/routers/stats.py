@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..db import get_db, ValidationRun, ProviderScore, DriftScore
@@ -7,27 +8,23 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 
 
 @router.get("")
-async def get_stats(db: Session = Depends(get_db)):
+def get_stats(db: Session = Depends(get_db)):
     latest = (
         db.query(ValidationRun)
         .order_by(ValidationRun.started_at.desc())
         .first()
     )
-    total_pcs = db.query(ProviderScore).count()
-    avg_pcs = None
-    if total_pcs:
-        avg_pcs = (
-            sum(s.pcs for s in db.query(ProviderScore).all()) / total_pcs
-        )
+    total_pcs = db.query(func.count(ProviderScore.id)).scalar() or 0
+    avg_pcs = db.query(func.avg(ProviderScore.pcs)).scalar() if total_pcs else None
 
-    drift_rows = db.query(DriftScore).all()
     drift_dist = {"Low": 0, "Medium": 0, "High": 0}
-    for d in drift_rows:
-        if d.bucket in drift_dist:
-            drift_dist[d.bucket] += 1
+    drift_counts = db.query(DriftScore.bucket, func.count(DriftScore.id)).group_by(DriftScore.bucket).all()
+    for bucket, count in drift_counts:
+        if bucket in drift_dist:
+            drift_dist[bucket] = count
 
     # PCS Distribution
-    pcs_scores = [s.pcs for s in db.query(ProviderScore).all()]
+    pcs_scores = [row[0] for row in db.query(ProviderScore.pcs).all()]
     pcs_dist = {"0-50": 0, "50-70": 0, "70-90": 0, "90-100": 0}
     for score in pcs_scores:
         if score < 50:

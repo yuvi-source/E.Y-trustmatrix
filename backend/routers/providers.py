@@ -94,27 +94,28 @@ async def get_provider_details(provider_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("")
-async def list_providers(db: Session = Depends(get_db)):
-    providers = db.query(Provider).all()
-    result = []
-    for p in providers:
-        score = db.query(ProviderScore).filter(ProviderScore.provider_id == p.id).first()
-        drift = db.query(DriftScore).filter(DriftScore.provider_id == p.id).first()
-        result.append(
-            {
-                "id": p.id,
-                "external_id": p.external_id,
-                "name": p.name,
-                "specialty": p.specialty,
-                "phone": p.phone,
-                "address": p.address,
-                "pcs": score.pcs if score else None,
-                "pcs_band": score.band if score else None,
-                "drift_score": drift.score if drift else None,
-                "drift_bucket": drift.bucket if drift else None,
-            }
-        )
-    return result
+def list_providers(db: Session = Depends(get_db)):
+    rows = (
+        db.query(Provider, ProviderScore, DriftScore)
+        .outerjoin(ProviderScore, ProviderScore.provider_id == Provider.id)
+        .outerjoin(DriftScore, DriftScore.provider_id == Provider.id)
+        .all()
+    )
+    return [
+        {
+            "id": provider.id,
+            "external_id": provider.external_id,
+            "name": provider.name,
+            "specialty": provider.specialty,
+            "phone": provider.phone,
+            "address": provider.address,
+            "pcs": score.pcs if score else None,
+            "pcs_band": score.band if score else None,
+            "drift_score": drift.score if drift else None,
+            "drift_bucket": drift.bucket if drift else None,
+        }
+        for (provider, score, drift) in rows
+    ]
 
 
 @router.get("/{provider_id}")
